@@ -1,0 +1,416 @@
+<!DOCTYPE HTML >
+<html>
+   <head>
+      <!--API-->
+	   <script src="https://app.gazerecorder.com/GazeRecorderAPI.js"></script>
+	   <script src="https://app.gazerecorder.com/GazePlayer.js"></script>
+      <script src="https://api.gazerecorder.com/GazeCloudAPI.js?v=1.2" ></script>
+      <script src="https://api.gazerecorder.com/heatmapLive.js" ></script>
+
+      <script type = "text/javascript">
+         //Selector de opciones par que se muestren los div contenedores de cada opción
+         function handleFileSelect(event) {
+            const file = event.target.files[0];
+            const imageContainer = document.getElementById("image-container");
+            const image = new Image();
+            image.src = URL.createObjectURL(file);
+            imageContainer.appendChild(image);
+            image.style.width = 300;
+            image.style.height = 300;
+
+            const uploadButtons = document.getElementsByClassName("upload-button");
+            const testButtons = document.getElementsByClassName("test-button");
+            for (let i = 0; i < uploadButtons.length; i++) {
+               uploadButtons[i].style.display = "none";
+            }
+            for (let i = 0; i < testButtons.length; i++) {
+               if(i != 1){
+                  testButtons[i].style.display = "block";
+               }
+            }
+         }
+
+         let optionVal;
+         //Función para el display de los formularios de ingreso para cada formato (imagen/video)
+         function handleOptionSelect(option) {
+            const imageForm = document.getElementById("upload-image-form");
+            const videoForm = document.getElementById("upload-video-form");
+            if (option === "image") {
+                imageForm.style.display = "block";
+                videoForm.style.display = "none";
+                optionVal = "image";
+            } else {
+                imageForm.style.display = "none";
+                videoForm.style.display = "block";
+                optionVal = "video";
+            }
+         }
+
+         //script para ingresar un video
+         function uploadVideo() {
+            var input = document.getElementById("video-input");
+            var btn = document.getElementById("upload-video-button");
+            input.style.display = "block";
+            input.onchange = function() {
+               var video = document.getElementById("video");
+               video.src = URL.createObjectURL(input.files[0]);
+               video.style.display = "block";
+               document.getElementById("video-player").style.display = "block";
+               video.style.width = "100%";
+               video.style.height = "100%";
+               btn.style.display = "none";
+            };
+            input.click();
+            const uploadButtons = document.getElementsByClassName("upload-button");
+            const testButtons = document.getElementsByClassName("test-button");
+            const btnPruebaImagen = document.getElementById("pruebaImagen");
+            const btnPruebaVideo= document.getElementById("pruebaVideo");
+            for (let i = 0; i < uploadButtons.length; i++) {
+               uploadButtons[i].style.display = "none";
+            }
+            for (let i = 0; i < testButtons.length; i++) {
+               if(i == 2){
+                  testButtons[i].style.display = "none";
+               }else{
+                  testButtons[i].style.display = "block";
+               }
+            }
+         }
+         function playPauseVideo() {
+            var video = document.getElementById("video");
+            if (video.paused) {
+                  video.play();
+            } else {
+                  video.pause();
+            }
+         }
+
+         //variables globales para el Gaze
+         let x,y,gaze;
+         //variables para cronometro
+         let timer;
+         let hours = 0;
+         let minutes = 0;
+         let seconds = 0;
+
+         //instanciación de variables para el gaze
+         function setVars(GazeData) {
+            x = GazeData.docX;
+            y = GazeData.docY;
+            gaze = document.getElementById("gaze");
+         }
+
+         //Funciones de prueba de calibración   
+         function PlotGaze(GazeData) {
+            //settea los valores de tracking en tiempo real
+            document.getElementById("GazeData").innerHTML = " DirMiradaX: " + GazeData.GazeX + " DirMiradaY: " + GazeData.GazeY;
+            document.getElementById("HeadPhoseData").innerHTML = " Rot/Pos CabezaX: " + GazeData.HeadX + " Rot/Pos CabezaY: " + GazeData.HeadY + " Posición CabezaZ: " + GazeData.HeadZ;
+            document.getElementById("HeadRotData").innerHTML = " Yaw: " + GazeData.HeadYaw + " Pitch: " + GazeData.HeadPitch + " Roll: " + GazeData.HeadRoll;
+            
+            setVars(GazeData);
+            
+            //Anchura interior del elemento
+            x -= gaze.clientWidth/2;
+            //Altura interior del elemento
+            y -= gaze.clientHeight/2;
+            //Setea la posición horizontal mediante la toma de la posición izquierda
+	         gaze.style.left = x + "px";
+            //Setea la posición vertical mediante la toma de la posición superior
+	         gaze.style.top = y + "px";
+            //Muestra o no el cursor de tracking de la mirada según las condiciones en tiempo real
+            if(GazeData.state != 0)
+            {
+               if( gaze.style.display  == 'block')
+                  gaze.style.display = 'none';
+            }
+            else
+            {
+               if( gaze.style.display  == 'none')
+                  gaze.style.display = 'block';
+            }
+         }
+
+         window.addEventListener("load", function() {
+            GazeCloudAPI.OnCalibrationComplete =function(){
+               ShowHeatMap(); console.log('Calibracion Completa');
+               if (optionVal == "video"){
+                  playPauseVideo();
+               }  
+            }
+            GazeCloudAPI.OnCamDenied =  function(){ console.log('No se puede obtener acceso a la cámara')  }
+            GazeCloudAPI.OnError =  function(msg){ console.log('ERROR: ' + msg)  }
+            GazeCloudAPI.UseClickRecalibration = true;
+            GazeCloudAPI.OnResult = PlotGaze; 
+         });
+
+         function handleClickHeatMap(cb) {
+            if( cb.checked)
+            {
+               ShowHeatMap();
+               document.getElementById("gaze").style.display = 'none';
+            }
+            else
+               RemoveHeatMap()
+         
+         }
+
+         //Funciones de usabilidad en una web
+         GazeRecorderAPI.OnNavigation = function(url)
+			{
+				document.getElementById("url").value = url;
+			}
+
+			function start(GazeData)
+			{
+				document.getElementById("inicio").style.display = 'block';
+				var url = document.getElementById("urlstart").value
+				GazeCloudAPI.StartEyeTracking();
+				GazeCloudAPI.OnCalibrationComplete  = function(){
+					GazeRecorderAPI.Rec(url);
+               toggleTimer();
+               resetTimer();
+               startTimer();
+				};
+            
+            setVars(GazeData);
+            //Anchura interior del elemento
+            x -= gaze.clientWidth/2;
+            //Altura interior del elemento
+            y -= gaze.clientHeight/2;
+            //Setea la posición horizontal mediante la toma de la posición izquierda
+	         gaze.style.left = x + "px";
+            //Setea la posición vertical mediante la toma de la posición superior
+	         gaze.style.top = y + "px";
+            //Muestra o no el cursor de tracking de la mirada según las condiciones en tiempo real
+            if(GazeData.state != 0)
+            {
+               if( gaze.style.display  == 'block')
+                  gaze.style.display = 'none';
+            }
+            else
+            {
+               if( gaze.style.display  == 'none')
+                  gaze.style.display = 'block';
+            }
+
+			}
+
+			function Navigate() 
+			{
+				var url = document.getElementById("url").value;
+				GazeRecorderAPI.Navigate (url );
+			}
+
+         //CRONOMETRO
+         function startTimer() {
+                timer = setInterval(() => {
+                    seconds++;
+
+                    if (seconds === 60) {
+                        seconds = 0;
+                        minutes++;
+                    }
+
+                    if (minutes === 60) {
+                        minutes = 0;
+                        hours++;
+                    }
+
+                    document.getElementById("timer").innerHTML = `${hours}:${minutes}:${seconds}`;
+                }, 1000);
+            }
+
+            function stopTimer() {
+                clearInterval(timer);
+            }
+            function resetTimer() {
+                clearInterval(timer);
+                hours = 0;
+                minutes = 0;
+                seconds = 0;
+                document.getElementById("timer").innerHTML = `${hours}:${minutes}:${seconds}`;
+            }
+
+            // Function to toggle the timer display
+            function toggleTimer() {
+                const timerDisplay = document.getElementById("timer-display");
+                if (timerDisplay.style.display === "none") {
+                    timerDisplay.style.display = "block";
+                } else {
+                    timerDisplay.style.display = "none";
+                }
+            }  
+            function generatePDF() {
+               window.print({marginsType: 0});
+            }
+      </script>
+      <style>
+         #upload-options {
+             display: flex;
+             margin: 20px;
+         }
+         #upload-options div {
+             margin: 0 10px;
+         }
+         #test-buttons {
+             display: flex;
+             margin: 20px;
+         }
+         #test-buttons div {
+             margin: 0 10px;
+         }
+         #video-player {
+            width: 650px;
+            height: 500px;
+            overflow: hidden; /* evita el cambio de tamaño si el video es mayor*/
+         }
+         #video {
+            width: 100%; /* para que se adapte al tamaño del div*/
+            height: 100%;
+         }
+         body{
+            font-family: Arial, Helvetica, sans-serif;
+            background-color: #f2f2f2;
+            margin: 0;
+            padding: 0; 
+          
+         }
+         @media print {
+            body { margin: 0; }
+         }
+         .cronometro{
+            font-size: 25px;
+            font-weight: bold;
+            text-align: center;
+            color: black;
+            float: left;
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+         }
+         .titulo{
+            color: black;
+            font-size: 2em;
+            font-weight: bold;
+            text-align: center;
+            text-shadow: 2px 2px 2px gray;
+         }
+         nav {
+  background-color: #333;
+  color: #fff;
+  display: flex;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+}
+
+
+nav button {
+  background-color: #333;
+  color: #fff;
+  padding: 14px 16px;
+  border: none;
+  margin: 0 10px;
+}
+
+nav a {
+  color: #fff;
+  text-decoration: none;
+  padding: 14px 16px;
+}
+
+nav a:hover {
+  background-color: #444;
+}
+
+.upload-button {
+  background-color: #000000; /* verde */
+  color: white;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.upload-button:hover {
+  background-color: #721616; /* verde oscuro */
+}
+
+     </style>
+   </head>
+   <body>
+      <!--SECCION CRONOMETRO-->
+      <section>
+         <div class="cronometro" id="timer-display" style="display: none;">
+            TIEMPO TRANSCURRIDO
+            <p id="timer">0:0:0</p>
+         </div>
+      </section>
+      <!--SECCIÓN DE CALIBRACIÓN-->
+      <section>
+         <div align='center'>
+            <h1 class="titulo">ANALISIS DE USABILIDAD CON MAPA DE CALOR</h1>
+            <!--
+               Los datos de la parametrización del eye tracking se usan mediante parámetros tomados de la mirada
+               - La primera fila de datos hacen referencia a la posición en el plano de los Ojos(mirada) tanto en X e Y para determinar la dirección
+               en la que están encaminados los ojos y determinar el punto de intersección con la pantalla
+               - La siguiente fila muestra la rotación de la cabeza en el plano X e Y a pesar de que la API referencia solo la mirada
+               toma en cuenta la posición de la cabeza en si como influencia en el resultado final de la mirada, de esta manera posiciona
+               en el plano si la cabeza ha rotado mostrando variaciones en la posición X si mira hacia izquierda o derecha (tomando valores
+               máximos cuando gira a la izquierda -los valores tienden de 8 a 8.4 en pruebas- y el valor mínimo cuando gira a la derecha -0-)
+               aunque si la rotación de la cabeza limita la visión de la cámara para detectar la mirada, saltará un error y se desplegará la
+               interfaz de posicionamiento corporal que viene por defecto de la API
+               - La última fila corresponde netamente a valoraciones tomados de razgos faciales en torno a lo mencionado anteriormente, esto
+               es usado en inteligencia artificial para la detección del movimiento del rostro, dicho en términos simples:
+               * YAW: Rotación horizontal de la cabeza (Girar de izq a derecha o al revés)
+               * PITCH: Movimiento vertical de la cabeza (arriba->abajo / abajo->arriba)
+               * ROLL: Movimiento horizontal solamente de la cabeza sin rotarla de izq a derecha o al revés
+               Para mayor entendimiento visitar la imagen detallada en el link de github
+               ( https://github.com/Belkim/EyeTrackerBackendTest ): 
+               https://user-images.githubusercontent.com/40554548/210865707-8d69b3b2-e06c-4809-9817-ddb0c5324a47.png
+            -->
+            <label for="ShowHeatMapId" style="display: none;">
+               Mostrar mapa de calor
+               <input id="ShowHeatMapId" type="checkbox" checked onclick='handleClickHeatMap(this);'>
+            </label>
+            <div style="display: none;">
+               <p>  
+                  Datos de parametrización en tiempo real del eye tracking:
+               <p id = "GazeData" > </p>
+               <p id = "HeadPhoseData" > </p>
+               <p id = "HeadRotData" > </p>
+               </p>
+            </div>
+            <nav   id="upload-options">
+               <a id="upload-image" onclick="handleOptionSelect('image')">Subir Imagen</a>
+               <a id="upload-video" onclick="handleOptionSelect('video')">Subir Video</a>
+            </nav>
+            <form id="upload-image-form" style="display:none">
+               <input type="file" class="upload-button" onchange="handleFileSelect(event)">
+            </form>
+            <div class="test-button" style="display: none;">
+               <button  type="button" onclick="GazeCloudAPI.StartEyeTracking();toggleTimer();startTimer();">Iniciar Prueba</button>
+               <button  type="button" id="pruebaImagen" onclick="GazeCloudAPI.StopEyeTracking();stopTimer();generatePDF();">Detener Prueba de Imagen</button>
+               <button  type="button" id="pruebaVideo" onclick="GazeCloudAPI.StopEyeTracking();stopTimer();playPauseVideo();generatePDF();">Detener Prueba de Video</button>
+            </div>
+            <div id="image-container">
+            </div>
+            <div id="upload-video-form" style="display:none">
+               <input type="file" id="video-input" accept="video/*" style="display: none;">
+               <button  class="upload-button" id="upload-video-button" onclick="uploadVideo()">Seleccionar un video</button>
+               <div id="video-player" style="display: none;">
+                  <video id="video" controls></video>
+               </div>
+            </div>
+           
+            <div id ="gaze" style ='position: absolute;display:none;width: 100px;height: 100px;border-radius: 50%;border: solid 2px  rgba(255, 255,255, .2);	box-shadow: 0 0 100px 3px rgba(125, 125,125, .5);	pointer-events: none;	z-index: 999999'></div>
+            <!--Este div es dinámico, ayuda a determinar el cursor de seguimiento ocular-->
+            
+         </div>
+      </section>
+   </body>
+</html>
